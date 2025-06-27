@@ -6,7 +6,6 @@ Handles storing and retrieving embeddings and metadata in Pinecone.
 import os
 from pinecone import Pinecone
 from typing import List, Dict
-from embeddings import model
 
 def init_pinecone():
     """Initialize Pinecone connection and create index if it doesn't exist."""
@@ -20,11 +19,15 @@ def init_pinecone():
     pc = Pinecone(api_key=api_key)
     
     # Create index if it doesn't exist
-    if index_name not in pc.list_indexes().names():
-        pc.create_index(
+    if not pc.has_index(index_name):
+        pc.create_index_for_model(
             name=index_name,
-            dimension=384,  # all-MiniLM-L6-v2 dimension
-            metric="cosine"
+            cloud="aws",
+            region="us-east-1",
+            embed={
+                "model": "llama-text-embed-v2",
+                "field_map": {"text": "chunk_text"}
+            }
         )
     
     return pc.Index(index_name)
@@ -64,8 +67,28 @@ def query_similar(query_text: str, index, top_k: int = 5):
     Returns:
         List of similar embeddings with metadata.
     """
-    # Generate embedding for query
-    query_embedding = model.encode([query_text], convert_to_tensor=False)[0].tolist()
+    # Generate embedding for the query text using the same model
+    from .embeddings import model
+    
+    try:
+        # Generate embedding for the query
+        query_embedding = model.encode([query_text], convert_to_tensor=False)[0]
+        
+        # Pad or truncate to 1024 dimensions to match Pinecone index
+        if len(query_embedding) < 1024:
+            # Pad with zeros
+            query_embedding = list(query_embedding) + [0.0] * (1024 - len(query_embedding))
+        else:
+            # Truncate to 1024
+            query_embedding = list(query_embedding[:1024])
+        
+        # Convert to Python float64
+        query_embedding = [float(x) for x in query_embedding]
+        
+    except Exception as e:
+        print(f"Error generating query embedding: {e}")
+        # Fallback to placeholder embedding
+        query_embedding = [0.0] * 1024
     
     # Query Pinecone
     results = index.query(

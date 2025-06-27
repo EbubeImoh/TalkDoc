@@ -1,20 +1,22 @@
 # 📄 TalkDoc - Document Q&A System
 
-An AI-powered application that allows users to upload documents and ask questions to get accurate, context-aware answers using LangChain and Pinecone.
+An AI-powered application that allows users to upload documents and ask questions to get accurate, context-aware answers using LangChain, Pinecone, and Ollama.
 
 ## 🚀 Features
 
 - **Multi-format Support**: Upload PDFs, DOCX, TXT, and Markdown files
 - **Smart Text Processing**: Automatic text extraction and chunking
 - **Vector Search**: Fast semantic search using Pinecone
-- **Open Source**: Uses HuggingFace models (no API costs for embeddings/LLM)
+- **Local AI Models**: Uses Ollama for privacy and cost-free LLM inference
 - **User-friendly UI**: Clean Streamlit interface
 - **Source Tracking**: See which documents and pages were used for answers
+- **Real-time Processing**: Live progress tracking during document processing
 
 ## 🛠️ Tech Stack
 
 - **LangChain**: LLM orchestration and retrieval
-- **HuggingFace**: Open-source embeddings (sentence-transformers) and LLM
+- **Ollama**: Local LLM inference (supports Llama3, Qwen, and other models)
+- **Sentence Transformers**: Open-source embeddings for semantic search
 - **Pinecone**: Vector database for similarity search
 - **Streamlit**: Web interface
 - **PyMuPDF**: PDF processing
@@ -24,19 +26,47 @@ An AI-powered application that allows users to upload documents and ask question
 
 - Python 3.8+
 - Pinecone account and API key
-- (Optional) OpenAI API key for alternative LLM
+- Ollama installed and running locally
+- At least one Ollama model downloaded (e.g., llama3:latest)
 
 ## 🚀 Quick Start
 
-### 1. Clone and Setup
+### 1. Install Ollama
+
+First, install Ollama on your system:
+
+```bash
+# macOS
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Linux
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Windows
+# Download from https://ollama.ai/download
+```
+
+### 2. Download a Model
+
+```bash
+# Start Ollama service
+ollama serve
+
+# Download a model (in a new terminal)
+ollama pull llama3:latest
+```
+
+### 3. Clone and Setup
 
 ```bash
 git clone <your-repo-url>
 cd TalkDoc
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Environment Configuration
+### 4. Environment Configuration
 
 Create a `.env` file in the project root:
 
@@ -44,21 +74,12 @@ Create a `.env` file in the project root:
 # Required
 PINECONE_API_KEY=your-pinecone-api-key
 PINECONE_INDEX=talkdoc-index
-
-# Optional
-OPENAI_API_KEY=your-openai-api-key
 ```
 
-### 3. Run the Application
+### 5. Run the Application
 
 ```bash
-python main.py
-```
-
-Or directly with Streamlit:
-
-```bash
-streamlit run app/ui.py
+streamlit run main.py
 ```
 
 The app will be available at `http://localhost:8501`
@@ -75,17 +96,17 @@ The app will be available at `http://localhost:8501`
 ```
 Document Upload → Text Extraction → Chunking → Embedding → Pinecone Storage
                                                            ↓
-User Question → Embedding → Similarity Search → Context Retrieval → LLM Answer
+User Question → Embedding → Similarity Search → Context Retrieval → Ollama LLM → Answer
 ```
 
 ### Core Modules
 
+- **`main.py`**: Application entry point and Streamlit interface
 - **`app/ingestion.py`**: Document parsing and text extraction
 - **`app/chunking.py`**: Text chunking with metadata preservation
-- **`app/embeddings.py`**: Vector embedding generation
-- **`app/vector_store.py`**: Pinecone integration
-- **`app/qa_chain.py`**: LangChain RetrievalQA orchestration
-- **`app/ui.py`**: Streamlit user interface
+- **`app/embeddings.py`**: Vector embedding generation using sentence-transformers
+- **`app/vector_store.py`**: Pinecone integration and similarity search
+- **`app/qa_chain.py`**: LangChain RetrievalQA orchestration with Ollama
 
 ## 🔧 Configuration
 
@@ -98,20 +119,31 @@ Modify in `app/chunking.py`:
 ### Embedding Model
 
 Change in `app/embeddings.py`:
-- Model: `all-MiniLM-L6-v2` (384 dimensions, fast and accurate)
+- Model: `all-mpnet-base-v2` (768 dimensions, high quality)
+- Automatically padded to 1024 dimensions for Pinecone compatibility
 
 ### LLM Model
 
 Modify in `app/qa_chain.py`:
-- Current: `microsoft/DialoGPT-medium`
-- Alternatives: `gpt2`, `EleutherAI/gpt-neo-125M`, etc.
+- Current: `llama3:latest`
+- Available models: `qwen2:7b`, `qwen2.5:latest`, `llama3.2:latest`, `tinyllama:latest`
+
+To use a different model:
+```python
+llm = OllamaLLM(
+    model="qwen2.5:latest",  # Change this to any model from ollama list
+    temperature=0.7,
+    top_p=0.9,
+    repeat_penalty=1.1
+)
+```
 
 ## 🚀 Deployment
 
 ### Local Development
 
 ```bash
-python main.py
+streamlit run main.py
 ```
 
 ### Docker (Optional)
@@ -123,7 +155,7 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 COPY . .
 EXPOSE 8501
-CMD ["streamlit", "run", "app/ui.py", "--server.port=8501"]
+CMD ["streamlit", "run", "main.py", "--server.port=8501"]
 ```
 
 ### Cloud Deployment
@@ -148,27 +180,47 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ### Common Issues
 
-1. **Pinecone Connection Error**
+1. **Ollama Connection Error**
+   ```bash
+   # Make sure Ollama is running
+   ollama serve
+   
+   # Check available models
+   ollama list
+   ```
+
+2. **Pinecone Connection Error**
    - Verify API key in `.env`
    - Check Pinecone dashboard for index status
 
-2. **Model Download Issues**
-   - Ensure stable internet connection
-   - Models are downloaded automatically on first use
+3. **Model Not Found**
+   ```bash
+   # Download the model
+   ollama pull llama3:latest
+   ```
 
-3. **Memory Issues**
+4. **Memory Issues**
+   - Use smaller models like `tinyllama:latest`
    - Reduce batch size in `app/embeddings.py`
-   - Use smaller models for LLM
 
 ### Performance Tips
 
 - Use GPU if available for faster embedding generation
 - Adjust chunk size based on document complexity
 - Consider using Pinecone's serverless option for cost optimization
+- Use smaller Ollama models for faster inference
 
 ## 📞 Support
 
 For issues and questions:
 - Create an issue on GitHub
 - Check the troubleshooting section above
-- Review Pinecone and HuggingFace documentation
+- Review Pinecone and Ollama documentation
+
+## 🔄 Recent Updates
+
+- **Ollama Integration**: Switched from local HuggingFace models to Ollama for better performance
+- **Improved Embeddings**: Using all-mpnet-base-v2 for higher quality semantic search
+- **Better Prompt Templates**: Enhanced answer generation with custom prompts
+- **Source Tracking**: Improved metadata storage and retrieval
+- **Error Handling**: Better error messages and fallback mechanisms

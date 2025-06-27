@@ -9,6 +9,10 @@ from dotenv import load_dotenv
 
 def main():
     """Main entry point for the Document Q&A System."""
+    # Add current directory to Python path
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, current_dir)
+    
     # Load environment variables
     load_dotenv()
     
@@ -23,21 +27,13 @@ def main():
         print("\nPlease set these variables in your .env file.")
         sys.exit(1)
     
-    # Launch Streamlit app
+    # Import and run the UI directly
     try:
-        import streamlit.web.cli as stcli
-        import sys
-        
-        # Set Streamlit configuration
-        os.environ['STREAMLIT_SERVER_PORT'] = '8501'
-        os.environ['STREAMLIT_SERVER_ADDRESS'] = 'localhost'
-        
-        # Launch the app
-        sys.argv = ["streamlit", "run", "app/ui.py", "--server.port=8501"]
-        sys.exit(stcli.main())
-        
-    except ImportError:
-        print("❌ Streamlit not found. Please install it with: pip install streamlit")
+        from app.ui import main as ui_main
+        ui_main()
+    except ImportError as e:
+        print(f"❌ Error importing UI module: {str(e)}")
+        print("Please ensure all dependencies are installed: pip install -r requirements.txt")
         sys.exit(1)
     except Exception as e:
         print(f"❌ Error launching app: {str(e)}")

@@ -7,11 +7,11 @@ import streamlit as st
 import os
 import tempfile
 from typing import List, Dict
-from ingestion import ingest_document
-from chunking import chunk_texts
-from embeddings import generate_embeddings
-from vector_store import init_pinecone, store_embeddings
-from qa_chain import create_qa_chain, answer_question
+from .ingestion import ingest_document
+from .chunking import chunk_texts
+from .embeddings import generate_embeddings
+from .vector_store import init_pinecone, store_embeddings
+from .qa_chain import create_qa_chain, answer_question
 
 def main():
     st.set_page_config(page_title="TalkDoc - Document Q&A System", layout="wide")
@@ -68,7 +68,12 @@ def process_documents(uploaded_files: List):
         all_chunks = []
         
         # Process each file
-        for uploaded_file in st.progress_bar(uploaded_files, text="Processing documents..."):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for i, uploaded_file in enumerate(uploaded_files):
+            status_text.text(f"Processing {uploaded_file.name}...")
+            
             # Save uploaded file temporarily
             with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_file.name.split('.')[-1]}") as tmp_file:
                 tmp_file.write(uploaded_file.getvalue())
@@ -88,6 +93,9 @@ def process_documents(uploaded_files: List):
             except Exception as e:
                 st.error(f"Error processing {uploaded_file.name}: {str(e)}")
                 continue
+            
+            # Update progress
+            progress_bar.progress((i + 1) / len(uploaded_files))
 
         if all_chunks:
             # Generate embeddings
